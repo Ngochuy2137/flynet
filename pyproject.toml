@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "flynet"
+version = "0.1.0"
+description = "A Python library for FlyNet"
+authors = [
+    { name="Huynn", email="Huy.nguyenngoc2137.email@example.com" }
+]
+readme = "README.md"
+requires-python = ">=3.7"
+dependencies = [
+    "numpy",
+    "torch"
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
