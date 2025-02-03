@@ -45,9 +45,7 @@ class LSTMClassifier(nn.Module):
 
 
 class ModelEvaluator:
-    def __init__(self, model, device, categories):
-        self.model = model
-        self.device = device
+    def __init__(self, categories):
         self.categories = categories
         self.category_labels = {category: idx for idx, category in enumerate(categories)}
 
@@ -64,52 +62,59 @@ class ModelEvaluator:
         test_samples = np.array(test_samples, dtype=np.float32)
         test_labels = np.array(test_labels, dtype=np.int64)
 
-        return torch.tensor(test_samples).to(self.device), torch.tensor(test_labels).to(self.device)
+        return torch.tensor(test_samples), torch.tensor(test_labels)
 
-    def evaluate(self, test_samples, test_labels):
-        correct = 0
-        total = len(test_samples)
-
-        with torch.no_grad():
-            lstm_out, (h_n, c_n) = self.model.lstm(test_samples)
-            lstm_features = h_n[-1]
-
-            print('lstm_features shape: ', lstm_features.shape)
-            print("LSTM output before FC layer (first 5 samples):")
-            print(lstm_features[:5])
-
-            outputs = self.model.fc(lstm_features)
-            _, predicted = torch.max(outputs, 1)
-
-            correct = (predicted == test_labels).sum().item()
-
-        accuracy = 100 * correct / total
+    def evaluate(self, predictions, test_labels, device):
+        correct = (predictions.to(device) == test_labels.to(device)).sum().item()
+        accuracy = 100 * correct / len(test_labels)
         return accuracy
 
 
+class FlyNetInfer:
+    def __init__(self, model_path, output_size, input_size=3, hidden_size=64):
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+        self.model_path = model_path
+        self.model = None
+        self.load_model(input_size, output_size, hidden_size)
+
+    def load_model(self, input_size, output_size, hidden_size):
+        self.model = LSTMClassifier(input_size, hidden_size, output_size).to(self.device)
+        self.model.load_state_dict(torch.load(self.model_path, map_location=self.device, weights_only=True))
+        self.model.eval()
+
+    def step(self, test_samples, get_feature_only=False):
+        with torch.no_grad():
+            lstm_out, (h_n, c_n) = self.model.lstm(test_samples.to(self.device))
+            lstm_features = h_n[-1]
+            print('lstm_features shape: ', lstm_features.shape)
+            if get_feature_only:
+                return lstm_features
+            
+            print("LSTM output before FC layer (first 5 samples):")
+            # print(lstm_features[:5])
+            outputs = self.model.fc(lstm_features)
+            _, predicted = torch.max(outputs, 1)
+        return predicted
+
+    def offline_run(self, data_parent_dir, categories):
+        data_loader = DataLoader(data_parent_dir, categories)
+        input_data = data_loader.load_data()
+        evaluator = ModelEvaluator(categories)
+        test_samples, test_labels = evaluator.prepare_data(input_data)
+        predictions = self.step(test_samples)
+        accuracy = evaluator.evaluate(predictions, test_labels, self.device)
+
+        print(f"Accuracy: {accuracy:.2f}%")
+
+
 if __name__ == "__main__":
-    device = torch.device('cuda')
     MODEL_PATH = '/home/server-huynn/workspace/robot_catching_project/trajectory_prediction/flynet/flynet/models/20250202_171238/best_model.pth'
     DATA_PARENT_DIR = '/home/server-huynn/workspace/robot_catching_project/trajectory_prediction/flynet/flynet/objects'
-
     categories = [
         'ball', 'big_sized_plane', 'boomerang', 'cardboard', 'chip_star',
         'empty_bottle', 'empty_can', 'hat', 'rain_visor', 'ring_frisbee',
         'sand_can', 'soft_frisbee', 'basket', 'carpet', 'styrofoam'
     ]
 
-    data_loader = DataLoader(DATA_PARENT_DIR, categories)
-    input_data = data_loader.load_data()
-
-    input_size = len(input_data['ball'][0][0])
-    output_size = len(categories)
-
-    model = LSTMClassifier(input_size, 64, output_size).to(device)
-    model.load_state_dict(torch.load(MODEL_PATH, map_location=device))
-    model.eval()
-
-    evaluator = ModelEvaluator(model, device, categories)
-    test_samples, test_labels = evaluator.prepare_data(input_data)
-    accuracy = evaluator.evaluate(test_samples, test_labels)
-
-    print(f"Accuracy: {accuracy:.2f}%")
+    system = FlyNetInfer(MODEL_PATH, input_size=3, output_size=len(categories), hidden_size=64)
+    system.offline_run(data_parent_dir=DATA_PARENT_DIR, categories=categories)
