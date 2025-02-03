@@ -78,15 +78,22 @@ class FlyNetInfer:
         self.load_model(input_size, output_size, hidden_size)
 
     def load_model(self, input_size, output_size, hidden_size):
+        print('FLYNET: Loading model from', self.model_path)
         self.model = LSTMClassifier(input_size, hidden_size, output_size).to(self.device)
         self.model.load_state_dict(torch.load(self.model_path, map_location=self.device, weights_only=True))
         self.model.eval()
 
-    def step(self, test_samples, get_feature_only=False):
+    def extract(self, test_samples, get_feature_only=False):
+        '''
+        extract feature of trajectory data
+        '''
+        # convert to torch tensor if not
+        if not isinstance(test_samples, torch.Tensor):
+            test_samples = torch.tensor(test_samples, dtype=torch.float32)
         with torch.no_grad():
             lstm_out, (h_n, c_n) = self.model.lstm(test_samples.to(self.device))
             lstm_features = h_n[-1]
-            print('lstm_features shape: ', lstm_features.shape)
+            # print('lstm_features shape: ', lstm_features.shape)
             if get_feature_only:
                 return lstm_features
             
@@ -101,7 +108,7 @@ class FlyNetInfer:
         input_data = data_loader.load_data()
         evaluator = ModelEvaluator(categories)
         test_samples, test_labels = evaluator.prepare_data(input_data)
-        predictions = self.step(test_samples)
+        predictions = self.extract(test_samples)
         accuracy = evaluator.evaluate(predictions, test_labels, self.device)
 
         print(f"Accuracy: {accuracy:.2f}%")
