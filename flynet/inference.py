@@ -33,9 +33,9 @@ class DataLoader:
 
 
 class LSTMClassifier(nn.Module):
-    def __init__(self, input_size, hidden_size, output_size):
+    def __init__(self, input_size, hidden_size, output_size, lstm_layers=1):
         super(LSTMClassifier, self).__init__()
-        self.lstm = nn.LSTM(input_size, hidden_size, batch_first=True)
+        self.lstm = nn.LSTM(input_size, hidden_size, num_layers=lstm_layers, batch_first=True)
         self.fc = nn.Linear(hidden_size, output_size)
 
     def forward(self, x):
@@ -71,15 +71,15 @@ class ModelEvaluator:
 
 
 class FlyNetInfer:
-    def __init__(self, model_path, output_size, input_size=3, hidden_size=64):
+    def __init__(self, model_path, output_size, input_size=3, hidden_size=64, lstm_layers=1):
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.model_path = model_path
         self.model = None
-        self.load_model(input_size, output_size, hidden_size)
+        self.load_model(input_size, output_size, hidden_size, lstm_layers)
 
-    def load_model(self, input_size, output_size, hidden_size):
+    def load_model(self, input_size, output_size, hidden_size, lstm_layers):
         print('FLYNET: Loading model from', self.model_path)
-        self.model = LSTMClassifier(input_size, hidden_size, output_size).to(self.device)
+        self.model = LSTMClassifier(input_size, hidden_size, output_size, lstm_layers).to(self.device)
         self.model.load_state_dict(torch.load(self.model_path, map_location=self.device, weights_only=True))
         self.model.eval()
 
