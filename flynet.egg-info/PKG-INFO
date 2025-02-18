@@ -1,9 +1,0 @@
-Metadata-Version: 2.2
-Name: flynet
-Version: 0.1.0
-Summary: A Python library for FlyNet
-Author-email: Huynn <Huy.nguyenngoc2137.email@example.com>
-Requires-Python: >=3.7
-Description-Content-Type: text/markdown
-Requires-Dist: numpy
-Requires-Dist: torch
