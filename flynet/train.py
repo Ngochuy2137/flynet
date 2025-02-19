@@ -9,7 +9,7 @@ import torch.optim as optim
 import matplotlib.pyplot as plt
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-
+DATA_PARENT_FOLDER = '/home/server-huynn/workspace/robot_catching_project/trajectory_prediction/mocap_ws/src/mocap_data_collection/data'
 # Data loading and preprocessing
 input_data = {
     'ball': [], 'big_sized_plane': [], 'boomerang': [], 'cardboard': [], 'chip_star': [],
@@ -52,91 +52,91 @@ for epoch in range(num_epochs):  # Set the number of epochs to 500
     styrofoam_file_num = np.random.randint(0, 100)  # Random styrofoam file number
 
     # ball
-    ball_file_path = f'./ball/ball_{ball_file_num}.csv'
+    ball_file_path = f'{DATA_PARENT_FOLDER}/ball/3-data-augmented/all/ball_{ball_file_num}.csv'
     ball_df = load_data(ball_file_path, num_samples=num_samples_per_file, epoch=epoch)
     for sample, start_idx, file_path in ball_df:
         input_data['ball'].append((sample, start_idx, file_path))
 
     # big_sized_plane
-    big_sized_plane_file_path = f'./big_sized_plane/big_sized_plane_{big_sized_plane_file_num}.csv'
+    big_sized_plane_file_path = f'{DATA_PARENT_FOLDER}/big_sized_plane/3-data-augmented/all/big_sized_plane_{big_sized_plane_file_num}.csv'   
     big_sized_plane_df = load_data(big_sized_plane_file_path, num_samples=num_samples_per_file, epoch=epoch)
     for sample, start_idx, file_path in big_sized_plane_df:
         input_data['big_sized_plane'].append((sample, start_idx, file_path))
 
     # boomerang
-    boomerang_file_path = f'./boomerang/boomerang_{boomerang_file_num}.csv'
+    boomerang_file_path = f'{DATA_PARENT_FOLDER}/boomerang/3-data-augmented/all/boomerang_{boomerang_file_num}.csv'
     boomerang_df = load_data(boomerang_file_path, num_samples=num_samples_per_file, epoch=epoch)
     for sample, start_idx, file_path in boomerang_df:
         input_data['boomerang'].append((sample, start_idx, file_path))
 
     # cardboard
-    cardboard_file_path = f'./cardboard/cardboard_{cardboard_file_num}.csv'
+    cardboard_file_path = f'{DATA_PARENT_FOLDER}/cardboard/3-data-augmented/all/cardboard_{cardboard_file_num}.csv'
     cardboard_df = load_data(cardboard_file_path, num_samples=num_samples_per_file, epoch=epoch)
     for sample, start_idx, file_path in cardboard_df:
         input_data['cardboard'].append((sample, start_idx, file_path))
 
     # chip_star
-    chip_star_file_path = f'./chip_star/chip_star_{chip_star_file_num}.csv'
+    chip_star_file_path = f'{DATA_PARENT_FOLDER}/chip_star/3-data-augmented/all/chip_star_{chip_star_file_num}.csv'
     chip_star_df = load_data(chip_star_file_path, num_samples=num_samples_per_file, epoch=epoch)
     for sample, start_idx, file_path in chip_star_df:
         input_data['chip_star'].append((sample, start_idx, file_path))
 
     # empty_bottle
-    empty_bottle_file_path = f'./empty_bottle/empty_bottle_{empty_bottle_file_num}.csv'
+    empty_bottle_file_path = f'{DATA_PARENT_FOLDER}/empty_bottle/3-data-augmented/all/empty_bottle_{empty_bottle_file_num}.csv'
     empty_bottle_df = load_data(empty_bottle_file_path, num_samples=num_samples_per_file, epoch=epoch)
     for sample, start_idx, file_path in empty_bottle_df:
         input_data['empty_bottle'].append((sample, start_idx, file_path))
 
     # empty_can
-    empty_can_file_path = f'./empty_can/empty_can_{empty_can_file_num}.csv'
+    empty_can_file_path = f'{DATA_PARENT_FOLDER}/empty_can/3-data-augmented/all/empty_can_{empty_can_file_num}.csv'
     empty_can_df = load_data(empty_can_file_path, num_samples=num_samples_per_file, epoch=epoch)
     for sample, start_idx, file_path in empty_can_df:
         input_data['empty_can'].append((sample, start_idx, file_path))
 
     # hat
-    hat_file_path = f'./hat/hat_{hat_file_num}.csv'
+    hat_file_path = f'{DATA_PARENT_FOLDER}/hat/3-data-augmented/all/hat_{hat_file_num}.csv'
     hat_df = load_data(hat_file_path, num_samples=num_samples_per_file, epoch=epoch)
     for sample, start_idx, file_path in hat_df:
         input_data['hat'].append((sample, start_idx, file_path))
 
     # rain_visor
-    rain_visor_file_path = f'./rain_visor/rain_visor_{rain_visor_file_num}.csv'
+    rain_visor_file_path = f'{DATA_PARENT_FOLDER}/rain_visor/3-data-augmented/all/rain_visor_{rain_visor_file_num}.csv'
     rain_visor_df = load_data(rain_visor_file_path, num_samples=num_samples_per_file, epoch=epoch)
     for sample, start_idx, file_path in rain_visor_df:
         input_data['rain_visor'].append((sample, start_idx, file_path))
 
     # ring_frisbee
-    ring_frisbee_file_path = f'./ring_frisbee/ring_frisbee_{ring_frisbee_file_num}.csv'
+    ring_frisbee_file_path = f'{DATA_PARENT_FOLDER}/ring_frisbee/3-data-augmented/all/ring_frisbee_{ring_frisbee_file_num}.csv'
     ring_frisbee_df = load_data(ring_frisbee_file_path, num_samples=num_samples_per_file, epoch=epoch)
     for sample, start_idx, file_path in ring_frisbee_df:
         input_data['ring_frisbee'].append((sample, start_idx, file_path))
         
     # sand_can
-    sand_can_file_path = f'./sand_can/sand_can_{sand_can_file_num}.csv'
+    sand_can_file_path = f'{DATA_PARENT_FOLDER}/sand_can/3-data-augmented/all/sand_can_{sand_can_file_num}.csv'
     sand_can_df = load_data(sand_can_file_path, num_samples=num_samples_per_file, epoch=epoch)
     for sample, start_idx, file_path in sand_can_df:
         input_data['sand_can'].append((sample, start_idx, file_path))
     
     # soft_frisbee
-    soft_frisbee_file_path = f'./soft_frisbee/soft_frisbee_{soft_frisbee_file_num}.csv'
+    soft_frisbee_file_path = f'{DATA_PARENT_FOLDER}/soft_frisbee/3-data-augmented/all/soft_frisbee_{soft_frisbee_file_num}.csv'
     soft_frisbee_df = load_data(soft_frisbee_file_path, num_samples=num_samples_per_file, epoch=epoch)
     for sample, start_idx, file_path in soft_frisbee_df:
         input_data['soft_frisbee'].append((sample, start_idx, file_path))
     
     # basket
-    basket_file_path = f'./basket/basket_{basket_file_num}.csv'
+    basket_file_path = f'{DATA_PARENT_FOLDER}/basket/3-data-augmented/all/basket_{basket_file_num}.csv'
     basket_df = load_data(basket_file_path, num_samples=num_samples_per_file, epoch=epoch)
     for sample, start_idx, file_path in basket_df:
         input_data['basket'].append((sample, start_idx, file_path))
     
     # carpet
-    carpet_file_path = f'./carpet/carpet_{carpet_file_num}.csv'
+    carpet_file_path = f'{DATA_PARENT_FOLDER}/carpet/3-data-augmented/all/carpet_{carpet_file_num}.csv'
     carpet_df = load_data(carpet_file_path, num_samples=num_samples_per_file, epoch=epoch)
     for sample, start_idx, file_path in carpet_df:
         input_data['carpet'].append((sample, start_idx, file_path))
     
     # styrofoam
-    styrofoam_file_path = f'./styrofoam/styrofoam_{styrofoam_file_num}.csv'
+    styrofoam_file_path = f'{DATA_PARENT_FOLDER}/styrofoam/3-data-augmented/all/styrofoam_{styrofoam_file_num}.csv'
     styrofoam_df = load_data(styrofoam_file_path, num_samples=num_samples_per_file, epoch=epoch)
     for sample, start_idx, file_path in styrofoam_df:
         input_data['styrofoam'].append((sample, start_idx, file_path))
@@ -204,9 +204,9 @@ test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=16, shuffle=F
 
 # Define the LSTM model
 class LSTMClassifier(nn.Module):
-    def __init__(self, input_size, hidden_size, output_size):
+    def __init__(self, input_size, hidden_size, output_size, num_layers=1):
         super(LSTMClassifier, self).__init__()
-        self.lstm = nn.LSTM(input_size, hidden_size, batch_first=True)
+        self.lstm = nn.LSTM(input_size, hidden_size, num_layers=num_layers, batch_first=True)
         self.fc = nn.Linear(hidden_size, output_size)
 
     def forward(self, x):
@@ -218,8 +218,9 @@ class LSTMClassifier(nn.Module):
 input_size = X_train.shape[2]  # Number of features
 hidden_size = 64  # Number of hidden units in LSTM
 output_size = len(input_data)  # Number of output classes (determined by the number of objects)
+num_layers = 2  # Number of LSTM layers
 
-model = LSTMClassifier(input_size, hidden_size, output_size).to(device)  # Move model to device (GPU or CPU)
+model = LSTMClassifier(input_size, hidden_size, output_size, num_layers).to(device)  # Move model to device (GPU or CPU)
 
 # Loss function and optimization algorithm
 criterion = nn.CrossEntropyLoss()
