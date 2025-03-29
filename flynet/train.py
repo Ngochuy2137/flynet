@@ -7,6 +7,10 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import matplotlib.pyplot as plt
+from python_utils.printer import Printer
+import re
+from tqdm import tqdm 
+global_printer = Printer()
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 DATA_PARENT_FOLDER = '/home/server-huynn/workspace/robot_catching_project/trajectory_prediction/mocap_ws/src/mocap_data_collection/data'
@@ -18,13 +22,18 @@ input_data = {
 }
 
 def load_data(file_path, time_steps=30, num_samples=1, epoch=None):
+    match = re.match(r'(.+)_\d+\.csv', os.path.basename(file_path))
+    if match:
+        label = match.group(1)  # "ball"
+    print('     Loading: ', label)
     df = pd.read_csv(file_path, header=None)
-    df = df.iloc[:, 1:]  # Remove the first column
+    df = df.iloc[:, 1:]  # Remove the first column  # shape (x*3)
+
     start_indices = np.random.randint(0, df.shape[0] - time_steps, num_samples)  # Random start indices
     samples = []
     for start_idx in start_indices:
-        if epoch is not None:
-            print(f"Epoch {epoch+1}: Train Sample CSV: {file_path}, Start Index: {start_idx}")
+        # if epoch is not None:
+        #     print(f"Epoch {epoch+1}: Train Sample CSV: {file_path}, Start Index: {start_idx}")
         samples.append((df.iloc[start_idx:start_idx+time_steps, :].values.tolist(), start_idx, file_path))  # Return sample, index, and file name
     return samples
 
@@ -33,7 +42,11 @@ num_data_files = 400  # Number of files to process
 num_samples_per_file = 32  # Number of samples per file
 num_epochs = 500  # Total number of epochs for training
 
+global_printer.print_blue('====================== LOADING DATA ======================')
+print('Total epoch: ', num_epochs)
+input('Press ENTER to continue ...')
 for epoch in range(num_epochs):  # Set the number of epochs to 500
+    global_printer.print_blue(f'----- Epoch {epoch} -----')
     # Randomly select files for the current epoch
     ball_file_num = np.random.randint(0, 100)  # Random ball file number
     big_sized_plane_file_num = np.random.randint(0, 100)  # Random big_sized_plane file number
@@ -141,6 +154,8 @@ for epoch in range(num_epochs):  # Set the number of epochs to 500
     for sample, start_idx, file_path in styrofoam_df:
         input_data['styrofoam'].append((sample, start_idx, file_path))
 
+global_printer.print_blue('Done loading data, starting setup input/label for training', background=True)
+input('Press ENTER to continue')
 # Create the dataset
 X = []
 y = []
@@ -154,7 +169,7 @@ labels = {
 
 for obj in input_data.keys():
     X_obj = np.array([x[0] for x in input_data[obj]])  # Get the samples for this object
-    y_obj = np.full(len(X_obj), labels[obj])  # Assign the correct label to this object
+    y_obj = np.full(len(X_obj), labels[obj])  # Assign the correct label to this object # 1 dim with full of labels[obj]
     X.append(X_obj)
     y.append(y_obj)
 
@@ -165,8 +180,8 @@ y = np.concatenate(y, axis=0)  # Combine all the labels
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
 # Reshape the data (for LSTM input)
-X_train = X_train.reshape(X_train.shape[0], X_train.shape[1], X_train.shape[2])  # (Number of samples, Time steps, Features)
-X_test = X_test.reshape(X_test.shape[0], X_test.shape[1], X_test.shape[2])  # (Number of samples, Time steps, Features)
+X_train = X_train.reshape(X_train.shape[0], X_train.shape[1], X_train.shape[2])  # (Number of samples, Time steps, Features)    # actually no meaning
+X_test = X_test.reshape(X_test.shape[0], X_test.shape[1], X_test.shape[2])  # (Number of samples, Time steps, Features)         # actually no meaning
 
 # Create PyTorch dataset
 class TimeSeriesDataset(torch.utils.data.Dataset):
