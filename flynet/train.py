@@ -13,6 +13,8 @@ import re
 from tqdm import tqdm 
 import time
 
+from flynet.utils import utils as flynet_utils
+
 global_printer = Printer()
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -228,19 +230,23 @@ num_layers = 2  # Number of LSTM layers
 LR = 0.0004  # Learning rate
 BATCH_SIZE = 128  # Batch size
 
-# Create PyTorch dataset
-class TimeSeriesDataset(torch.utils.data.Dataset):
-    def __init__(self, X, y, indices=None, file_paths=None):
-        self.X = torch.tensor(X, dtype=torch.float32).to(device)  # Move to device (GPU or CPU)
-        self.y = torch.tensor(y, dtype=torch.long).to(device)  # Move to device (GPU or CPU)
-        self.indices = indices  # List of start indices
-        self.file_paths = file_paths  # List of file paths
+# Get current time to create a new folder for saving the models
+current_time = datetime.now().strftime("%Y%m%d_%H%M%S")
 
-    def __len__(self):
-        return len(self.X)
+wandb = flynet_utils.init_wandb(project_name='Flynet', run_name = f'_hid{hidden_size}_layer{num_layers}' + current_time, \
+                                config={
+                                    'input_size': input_size,
+                                    'hidden_size': hidden_size,
+                                    'output_size': output_size,
+                                    'num_layers': num_layers,
+                                    'learning_rate': LR,
+                                    'batch_size': BATCH_SIZE,
+                                    'num_epochs': num_epochs
+                                }, run_id=None, resume=None, wdb_notes='')
 
-    def __getitem__(self, idx):
-        return self.X[idx], self.y[idx], self.indices[idx], self.file_paths[idx]  # Return index and file path as well
+model_dir = f"models/{current_time}"
+# Create the directory if it does not exist
+os.makedirs(model_dir, exist_ok=True)
 
 # Get index and file path information
 train_indices = []
@@ -255,8 +261,8 @@ for obj in input_data.keys():
     train_file_paths.extend([x[2] for x in input_data[obj][:len(X_train)//len(input_data.keys())]])
     test_file_paths.extend([x[2] for x in input_data[obj][len(X_train)//len(input_data.keys()):]])
 
-train_dataset = TimeSeriesDataset(X_train, y_train, train_indices, train_file_paths)
-test_dataset = TimeSeriesDataset(X_test, y_test, test_indices, test_file_paths)
+train_dataset = flynet_utils.TimeSeriesDataset(X_train, y_train, train_indices, train_file_paths)
+test_dataset = flynet_utils.TimeSeriesDataset(X_test, y_test, test_indices, test_file_paths)
 
 # Create DataLoader with batch size BATCH_SIZE
 train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
@@ -283,16 +289,9 @@ optimizer = optim.Adam(model.parameters(), lr=LR)
 # Initialize variables to track the best loss
 best_loss = float('inf')
 
-# Get current time to create a new folder for saving the models
-current_time = datetime.now().strftime("%Y%m%d_%H%M%S")
-model_dir = f"models/{current_time}"
-
-# Create the directory if it does not exist
-os.makedirs(model_dir, exist_ok=True)
-
 losses = []
-plt.ion()  # Interactive mode ON
-fig, ax = plt.subplots(figsize=(8, 5))
+# plt.ion()  # Interactive mode ON
+# fig, ax = plt.subplots(figsize=(8, 5))
 # Training loop
 time_train_start = time.time()
 for epoch in range(num_epochs):
@@ -310,14 +309,14 @@ for epoch in range(num_epochs):
     avg_epoch_loss = epoch_loss / len(train_loader)  # Calculate average loss for the epoch
     losses.append(avg_epoch_loss)
     
-    # Plot loss
-    ax.clear()
-    ax.plot(range(1, len(losses) + 1), losses, linestyle='-')
-    ax.set_xlabel("Epoch")
-    ax.set_ylabel("Loss")
-    ax.grid()
-    if epoch > 100:
-        ax.set_ylim(0,0.1)
+    # # Plot loss
+    # ax.clear()
+    # ax.plot(range(1, len(losses) + 1), losses, linestyle='-')
+    # ax.set_xlabel("Epoch")
+    # ax.set_ylabel("Loss")
+    # ax.grid()
+    # if epoch > 100:
+    #     ax.set_ylim(0,0.1)
     plt.pause(0.1)  # Short pause to update the plot
 
     # Save model every 100 epochs
@@ -336,6 +335,9 @@ for epoch in range(num_epochs):
     global_printer.print_green(f"Epoch {epoch+1}/{num_epochs}, Avg Loss: {avg_epoch_loss}")
     time_left = (time.time()-time_train_start) / (epoch+1) * (num_epochs - epoch - 1)
     print(f"    Time left: {time.strftime('%H:%M:%S', time.gmtime(time_left))}")
+    wandb.log({
+        'Avg Loss': avg_epoch_loss,
+    }, step=epoch)
 
 # Model evaluation
 model.eval()
