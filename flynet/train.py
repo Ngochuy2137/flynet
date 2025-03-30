@@ -233,7 +233,7 @@ BATCH_SIZE = 128  # Batch size
 # Get current time to create a new folder for saving the models
 current_time = datetime.now().strftime("%Y%m%d_%H%M%S")
 
-wandb = flynet_utils.init_wandb(project_name='Flynet', run_name = f'_hid{hidden_size}_layer{num_layers}' + current_time, \
+wandb = flynet_utils.init_wandb(project_name='Flynet', run_name = f'hid{hidden_size}_layer{num_layers}_' + current_time, \
                                 config={
                                     'input_size': input_size,
                                     'hidden_size': hidden_size,
