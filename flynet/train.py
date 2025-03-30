@@ -1,3 +1,4 @@
+# %%
 import os
 from datetime import datetime
 import pandas as pd
@@ -10,6 +11,8 @@ import matplotlib.pyplot as plt
 from python_utils.printer import Printer
 import re
 from tqdm import tqdm 
+import time
+
 global_printer = Printer()
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -38,16 +41,18 @@ def load_data(file_path, time_steps=30, random_sampling_params=None, sche_sampli
     elif sche_sampling_params is not None:
         first_part_length = sche_sampling_params[0]
         sche_step = sche_sampling_params[1]
-        if df.shape[0] < first_part_length:
+        if df.shape[0] < first_part_length + time_steps:
             global_printer.print_yellow('first_part_length need to be smaller than df.shape[0] (trajectory length)')
-            first_part_length = df.shape[0]
+            first_part_length = df.shape[0] - time_steps
         start_indices = np.arange(0, first_part_length, sche_step)
 
     samples = []
     for start_idx in start_indices:
-        # if epoch is not None:
-        #     print(f"Epoch {epoch+1}: Train Sample CSV: {file_path}, Start Index: {start_idx}")
-        samples.append((df.iloc[start_idx:start_idx+time_steps, :].values.tolist(), start_idx, file_path))  # Return sample, index, and file name
+        segments_np = np.array(df.iloc[start_idx:start_idx+time_steps, :].values.tolist()) 
+        if segments_np.shape[0] != time_steps:
+            global_printer.print_red(f'segments_np.shape = {segments_np.shape}')
+            print(file_path); input()
+        samples.append((segments_np, start_idx, file_path))  # Return sample, index, and file name
     return samples
 
 # Read data for ball, big_sized_plane, boomerang, cardboard, chip_star, empty_bottle, empty_can, hat, rain_visor, ring_frisbee
@@ -169,6 +174,8 @@ for traj_idx in range(400):  # Set the number of epochs to 500
 
 global_printer.print_blue('Done loading data, starting setup input/label for training', background=True)
 input('Press ENTER to continue')
+
+# %%
 # Create the dataset
 X = []
 y = []
@@ -181,20 +188,45 @@ labels = {
 }
 
 for obj in input_data.keys():
-    X_obj = np.array([x[0] for x in input_data[obj]])  # Get the samples for this object
+    # print('check 111: ', len(input_data[obj]))              # 24000
+    # # print('check 111: ', len(input_data[obj][0]))           # 3 (tuple)
+    # # print('check 111: ', input_data[obj][0][0].shape)       # (30, 3)
+    # print('input_data[obj][0][1]: ', input_data[obj][0][1])  # start index
+    # print('input_data[obj][0][2]: ', input_data[obj][0][2])  # file path
+
+    # print('check 222: ', input_data[obj][0][0].shape)       # (30, 3)
+    # print('input_data[obj][2][1]: ', input_data[obj][2][1])  # start index
+    # print('input_data[obj][2][2]: ', input_data[obj][2][2])  # file path
+    # # input()
+    traj_segs = [traj_seg[0] for traj_seg in input_data[obj]]
+    X_obj = np.array(traj_segs)
     y_obj = np.full(len(X_obj), labels[obj])  # Assign the correct label to this object # 1 dim with full of labels[obj]
+    # print('X_obj shape: ', X_obj.shape)  # (24000, 30, 3)
+    # print('y_obj shape: ', y_obj.shape)  # (24000,)
     X.append(X_obj)
     y.append(y_obj)
 
 X = np.concatenate(X, axis=0)  # Combine all the data
 y = np.concatenate(y, axis=0)  # Combine all the labels
+print('X shape: ', X.shape)
+print('y shape: ', y.shape)
 
+
+# %%
 # Split into train and test data
 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
 # Reshape the data (for LSTM input)
 X_train = X_train.reshape(X_train.shape[0], X_train.shape[1], X_train.shape[2])  # (Number of samples, Time steps, Features)    # actually no meaning
 X_test = X_test.reshape(X_test.shape[0], X_test.shape[1], X_test.shape[2])  # (Number of samples, Time steps, Features)         # actually no meaning
+
+# Initialize the model
+input_size = X_train.shape[2]  # Number of features
+hidden_size = 64  # Number of hidden units in LSTM
+output_size = len(input_data)  # Number of output classes (determined by the number of objects)
+num_layers = 2  # Number of LSTM layers
+LR = 0.0004  # Learning rate
+BATCH_SIZE = 128  # Batch size
 
 # Create PyTorch dataset
 class TimeSeriesDataset(torch.utils.data.Dataset):
@@ -226,9 +258,9 @@ for obj in input_data.keys():
 train_dataset = TimeSeriesDataset(X_train, y_train, train_indices, train_file_paths)
 test_dataset = TimeSeriesDataset(X_test, y_test, test_indices, test_file_paths)
 
-# Create DataLoader with batch size 16
-train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=16, shuffle=True)
-test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=16, shuffle=False)
+# Create DataLoader with batch size BATCH_SIZE
+train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
+test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False)
 
 # Define the LSTM model
 class LSTMClassifier(nn.Module):
@@ -242,17 +274,11 @@ class LSTMClassifier(nn.Module):
         out = self.fc(h_n[-1])
         return out
 
-# Initialize the model
-input_size = X_train.shape[2]  # Number of features
-hidden_size = 64  # Number of hidden units in LSTM
-output_size = len(input_data)  # Number of output classes (determined by the number of objects)
-num_layers = 2  # Number of LSTM layers
-
 model = LSTMClassifier(input_size, hidden_size, output_size, num_layers).to(device)  # Move model to device (GPU or CPU)
 
 # Loss function and optimization algorithm
 criterion = nn.CrossEntropyLoss()
-optimizer = optim.Adam(model.parameters(), lr=0.0002)
+optimizer = optim.Adam(model.parameters(), lr=LR)
 
 # Initialize variables to track the best loss
 best_loss = float('inf')
@@ -268,6 +294,7 @@ losses = []
 plt.ion()  # Interactive mode ON
 fig, ax = plt.subplots(figsize=(8, 5))
 # Training loop
+time_train_start = time.time()
 for epoch in range(num_epochs):
     model.train()
     epoch_loss = 0.0
@@ -306,7 +333,9 @@ for epoch in range(num_epochs):
         torch.save(model.state_dict(), best_model_path)
         print(f"Best model saved with loss: {best_loss} to {best_model_path}")
 
-    print(f"Epoch {epoch+1}/{num_epochs}, Avg Loss: {avg_epoch_loss}")
+    global_printer.print_green(f"Epoch {epoch+1}/{num_epochs}, Avg Loss: {avg_epoch_loss}")
+    time_left = (time.time()-time_train_start) / (epoch+1) * (num_epochs - epoch - 1)
+    print(f"    Time left: {time.strftime('%H:%M:%S', time.gmtime(time_left))}")
 
 # Model evaluation
 model.eval()
