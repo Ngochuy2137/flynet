@@ -12,6 +12,7 @@ from python_utils.printer import Printer
 import re
 from tqdm import tqdm 
 import time
+import json
 
 from flynet.utils import utils as flynet_utils
 
@@ -19,43 +20,37 @@ global_printer = Printer()
 
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 DATA_PARENT_FOLDER = '/home/server-huynn/workspace/robot_catching_project/trajectory_prediction/mocap_ws/src/mocap_data_collection/data'
+
+# Load config
+with open('configs/training_config.json', 'r') as f:
+    CONFIG = json.load(f)
+# Hyperparameters
+hidden_size = CONFIG['model']['hidden_size']  # Hidden size of LSTM
+num_layers = CONFIG['model']['num_layers']  # Number of LSTM layers
+batch_size = CONFIG['training']['batch_size']  # Batch size
+lr = CONFIG['training']['learning_rate']  # Learning rate
+num_data_files = CONFIG['data_sampling']['num_data_files']  # Number of data files to load
+random_sampling_params = CONFIG['data_sampling']['random_sampling_params']  # Random sampling parameters
+sche_sampling_params = CONFIG['data_sampling']['sche_sampling_params']  # Scheduled sampling parameters
+
+
+global_printer.print_blue('====================== LOADING CONFIG ======================', background=True)
+print('     Hidden size: ', hidden_size)
+print('     Number of layers: ', num_layers)
+print('     Batch size: ', batch_size)
+print('     Learning rate: ', lr)
+print('     Number of data files: ', num_data_files)
+print('     Random sampling parameters: ', random_sampling_params)
+print('     Scheduled sampling parameters: ', sche_sampling_params)
+global_printer.print_blue('====================== Check carefully ======================', background=True)
+input('press ENTER to continue ...')
+
 # Data loading and preprocessing
 input_data = {
     'ball': [], 'big_sized_plane': [], 'boomerang': [], 'cardboard': [], 'chip_star': [],
     'empty_bottle': [], 'empty_can': [], 'hat': [], 'rain_visor': [], 'ring_frisbee': [],
     'sand_can': [], 'soft_frisbee': [], 'basket': [], 'carpet': [], 'styrofoam': []
 }
-
-def load_data(file_path, time_steps=30, random_sampling_params=None, sche_sampling_params=None):
-    match = re.match(r'(.+)_\d+\.csv', os.path.basename(file_path))
-    if match:
-        label = match.group(1)  # "ball"
-    print('     Loading: ', label)
-    df = pd.read_csv(file_path, header=None)
-    df = df.iloc[:, 1:]  # Remove the first column  # shape (x*3)
-
-    if (random_sampling_params is None) == (sche_sampling_params is None):
-        global_printer.print_red('Cannot use random_sampling mode and sche_sampling mode at the same time')
-        raise ValueError('random_sampling and sche_sampling cannot be both None or both not None at the same time.')
-    if random_sampling_params is not None:
-        num_samples = random_sampling_params
-        start_indices = np.random.randint(0, df.shape[0] - time_steps, num_samples)  # Random start indices
-    elif sche_sampling_params is not None:
-        first_part_length = sche_sampling_params[0]
-        sche_step = sche_sampling_params[1]
-        if df.shape[0] < first_part_length + time_steps:
-            global_printer.print_yellow('first_part_length need to be smaller than df.shape[0] (trajectory length)')
-            first_part_length = df.shape[0] - time_steps
-        start_indices = np.arange(0, first_part_length, sche_step)
-
-    samples = []
-    for start_idx in start_indices:
-        segments_np = np.array(df.iloc[start_idx:start_idx+time_steps, :].values.tolist()) 
-        if segments_np.shape[0] != time_steps:
-            global_printer.print_red(f'segments_np.shape = {segments_np.shape}')
-            print(file_path); input()
-        samples.append((segments_np, start_idx, file_path))  # Return sample, index, and file name
-    return samples
 
 # Read data for ball, big_sized_plane, boomerang, cardboard, chip_star, empty_bottle, empty_can, hat, rain_visor, ring_frisbee
 num_data_files = 400  # Number of files to process
@@ -86,91 +81,91 @@ for traj_idx in range(400):  # Set the number of epochs to 500
 
     # ball
     ball_file_path = f'{DATA_PARENT_FOLDER}/ball/3-data-augmented/all/ball_{ball_file_num}.csv'
-    ball_df = load_data(ball_file_path, random_sampling_params=random_sampling_params, sche_sampling_params=sche_sampling_params)
+    ball_df = flynet_utils.load_data(ball_file_path, random_sampling_params=random_sampling_params, sche_sampling_params=sche_sampling_params)
     for sample, start_idx, file_path in ball_df:
         input_data['ball'].append((sample, start_idx, file_path))
 
     # big_sized_plane
     big_sized_plane_file_path = f'{DATA_PARENT_FOLDER}/big_sized_plane/3-data-augmented/all/big_sized_plane_{big_sized_plane_file_num}.csv'   
-    big_sized_plane_df = load_data(big_sized_plane_file_path, random_sampling_params=random_sampling_params, sche_sampling_params=sche_sampling_params)
+    big_sized_plane_df = flynet_utils.load_data(big_sized_plane_file_path, random_sampling_params=random_sampling_params, sche_sampling_params=sche_sampling_params)
     for sample, start_idx, file_path in big_sized_plane_df:
         input_data['big_sized_plane'].append((sample, start_idx, file_path))
 
     # boomerang
     boomerang_file_path = f'{DATA_PARENT_FOLDER}/boomerang/3-data-augmented/all/boomerang_{boomerang_file_num}.csv'
-    boomerang_df = load_data(boomerang_file_path, random_sampling_params=random_sampling_params, sche_sampling_params=sche_sampling_params)
+    boomerang_df = flynet_utils.load_data(boomerang_file_path, random_sampling_params=random_sampling_params, sche_sampling_params=sche_sampling_params)
     for sample, start_idx, file_path in boomerang_df:
         input_data['boomerang'].append((sample, start_idx, file_path))
 
     # cardboard
     cardboard_file_path = f'{DATA_PARENT_FOLDER}/cardboard/3-data-augmented/all/cardboard_{cardboard_file_num}.csv'
-    cardboard_df = load_data(cardboard_file_path, random_sampling_params=random_sampling_params, sche_sampling_params=sche_sampling_params)
+    cardboard_df = flynet_utils.load_data(cardboard_file_path, random_sampling_params=random_sampling_params, sche_sampling_params=sche_sampling_params)
     for sample, start_idx, file_path in cardboard_df:
         input_data['cardboard'].append((sample, start_idx, file_path))
 
     # chip_star
     chip_star_file_path = f'{DATA_PARENT_FOLDER}/chip_star/3-data-augmented/all/chip_star_{chip_star_file_num}.csv'
-    chip_star_df = load_data(chip_star_file_path, random_sampling_params=random_sampling_params, sche_sampling_params=sche_sampling_params)
+    chip_star_df = flynet_utils.load_data(chip_star_file_path, random_sampling_params=random_sampling_params, sche_sampling_params=sche_sampling_params)
     for sample, start_idx, file_path in chip_star_df:
         input_data['chip_star'].append((sample, start_idx, file_path))
 
     # empty_bottle
     empty_bottle_file_path = f'{DATA_PARENT_FOLDER}/empty_bottle/3-data-augmented/all/empty_bottle_{empty_bottle_file_num}.csv'
-    empty_bottle_df = load_data(empty_bottle_file_path, random_sampling_params=random_sampling_params, sche_sampling_params=sche_sampling_params)
+    empty_bottle_df = flynet_utils.load_data(empty_bottle_file_path, random_sampling_params=random_sampling_params, sche_sampling_params=sche_sampling_params)
     for sample, start_idx, file_path in empty_bottle_df:
         input_data['empty_bottle'].append((sample, start_idx, file_path))
 
     # empty_can
     empty_can_file_path = f'{DATA_PARENT_FOLDER}/empty_can/3-data-augmented/all/empty_can_{empty_can_file_num}.csv'
-    empty_can_df = load_data(empty_can_file_path, random_sampling_params=random_sampling_params, sche_sampling_params=sche_sampling_params)
+    empty_can_df = flynet_utils.load_data(empty_can_file_path, random_sampling_params=random_sampling_params, sche_sampling_params=sche_sampling_params)
     for sample, start_idx, file_path in empty_can_df:
         input_data['empty_can'].append((sample, start_idx, file_path))
 
     # hat
     hat_file_path = f'{DATA_PARENT_FOLDER}/hat/3-data-augmented/all/hat_{hat_file_num}.csv'
-    hat_df = load_data(hat_file_path, random_sampling_params=random_sampling_params, sche_sampling_params=sche_sampling_params)
+    hat_df = flynet_utils.load_data(hat_file_path, random_sampling_params=random_sampling_params, sche_sampling_params=sche_sampling_params)
     for sample, start_idx, file_path in hat_df:
         input_data['hat'].append((sample, start_idx, file_path))
 
     # rain_visor
     rain_visor_file_path = f'{DATA_PARENT_FOLDER}/rain_visor/3-data-augmented/all/rain_visor_{rain_visor_file_num}.csv'
-    rain_visor_df = load_data(rain_visor_file_path, random_sampling_params=random_sampling_params, sche_sampling_params=sche_sampling_params)
+    rain_visor_df = flynet_utils.load_data(rain_visor_file_path, random_sampling_params=random_sampling_params, sche_sampling_params=sche_sampling_params)
     for sample, start_idx, file_path in rain_visor_df:
         input_data['rain_visor'].append((sample, start_idx, file_path))
 
     # ring_frisbee
     ring_frisbee_file_path = f'{DATA_PARENT_FOLDER}/ring_frisbee/3-data-augmented/all/ring_frisbee_{ring_frisbee_file_num}.csv'
-    ring_frisbee_df = load_data(ring_frisbee_file_path, random_sampling_params=random_sampling_params, sche_sampling_params=sche_sampling_params)
+    ring_frisbee_df = flynet_utils.load_data(ring_frisbee_file_path, random_sampling_params=random_sampling_params, sche_sampling_params=sche_sampling_params)
     for sample, start_idx, file_path in ring_frisbee_df:
         input_data['ring_frisbee'].append((sample, start_idx, file_path))
         
     # sand_can
     sand_can_file_path = f'{DATA_PARENT_FOLDER}/sand_can/3-data-augmented/all/sand_can_{sand_can_file_num}.csv'
-    sand_can_df = load_data(sand_can_file_path, random_sampling_params=random_sampling_params, sche_sampling_params=sche_sampling_params)
+    sand_can_df = flynet_utils.load_data(sand_can_file_path, random_sampling_params=random_sampling_params, sche_sampling_params=sche_sampling_params)
     for sample, start_idx, file_path in sand_can_df:
         input_data['sand_can'].append((sample, start_idx, file_path))
     
     # soft_frisbee
     soft_frisbee_file_path = f'{DATA_PARENT_FOLDER}/soft_frisbee/3-data-augmented/all/soft_frisbee_{soft_frisbee_file_num}.csv'
-    soft_frisbee_df = load_data(soft_frisbee_file_path, random_sampling_params=random_sampling_params, sche_sampling_params=sche_sampling_params)
+    soft_frisbee_df = flynet_utils.load_data(soft_frisbee_file_path, random_sampling_params=random_sampling_params, sche_sampling_params=sche_sampling_params)
     for sample, start_idx, file_path in soft_frisbee_df:
         input_data['soft_frisbee'].append((sample, start_idx, file_path))
     
     # basket
     basket_file_path = f'{DATA_PARENT_FOLDER}/basket/3-data-augmented/all/basket_{basket_file_num}.csv'
-    basket_df = load_data(basket_file_path, random_sampling_params=random_sampling_params, sche_sampling_params=sche_sampling_params)
+    basket_df = flynet_utils.load_data(basket_file_path, random_sampling_params=random_sampling_params, sche_sampling_params=sche_sampling_params)
     for sample, start_idx, file_path in basket_df:
         input_data['basket'].append((sample, start_idx, file_path))
     
     # carpet
     carpet_file_path = f'{DATA_PARENT_FOLDER}/carpet/3-data-augmented/all/carpet_{carpet_file_num}.csv'
-    carpet_df = load_data(carpet_file_path, random_sampling_params=random_sampling_params, sche_sampling_params=sche_sampling_params)
+    carpet_df = flynet_utils.load_data(carpet_file_path, random_sampling_params=random_sampling_params, sche_sampling_params=sche_sampling_params)
     for sample, start_idx, file_path in carpet_df:
         input_data['carpet'].append((sample, start_idx, file_path))
     
     # styrofoam
     styrofoam_file_path = f'{DATA_PARENT_FOLDER}/styrofoam/3-data-augmented/all/styrofoam_{styrofoam_file_num}.csv'
-    styrofoam_df = load_data(styrofoam_file_path, random_sampling_params=random_sampling_params, sche_sampling_params=sche_sampling_params)
+    styrofoam_df = flynet_utils.load_data(styrofoam_file_path, random_sampling_params=random_sampling_params, sche_sampling_params=sche_sampling_params)
     for sample, start_idx, file_path in styrofoam_df:
         input_data['styrofoam'].append((sample, start_idx, file_path))
 
@@ -224,11 +219,7 @@ X_test = X_test.reshape(X_test.shape[0], X_test.shape[1], X_test.shape[2])  # (N
 
 # Initialize the model
 input_size = X_train.shape[2]  # Number of features
-hidden_size = 64  # Number of hidden units in LSTM
 output_size = len(input_data)  # Number of output classes (determined by the number of objects)
-num_layers = 2  # Number of LSTM layers
-LR = 0.0004  # Learning rate
-BATCH_SIZE = 128  # Batch size
 
 # Get current time to create a new folder for saving the models
 current_time = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -239,8 +230,8 @@ wandb = flynet_utils.init_wandb(project_name='Flynet', run_name = f'hid{hidden_s
                                     'hidden_size': hidden_size,
                                     'output_size': output_size,
                                     'num_layers': num_layers,
-                                    'learning_rate': LR,
-                                    'batch_size': BATCH_SIZE,
+                                    'learning_rate': lr,
+                                    'batch_size': batch_size,
                                     'num_epochs': num_epochs
                                 }, run_id=None, resume=None, wdb_notes='')
 
@@ -264,9 +255,9 @@ for obj in input_data.keys():
 train_dataset = flynet_utils.TimeSeriesDataset(X_train, y_train, train_indices, train_file_paths)
 test_dataset = flynet_utils.TimeSeriesDataset(X_test, y_test, test_indices, test_file_paths)
 
-# Create DataLoader with batch size BATCH_SIZE
-train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=BATCH_SIZE, shuffle=True)
-test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=BATCH_SIZE, shuffle=False)
+# Create DataLoader with batch size batch_size
+train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
 # Define the LSTM model
 class LSTMClassifier(nn.Module):
@@ -284,7 +275,7 @@ model = LSTMClassifier(input_size, hidden_size, output_size, num_layers).to(devi
 
 # Loss function and optimization algorithm
 criterion = nn.CrossEntropyLoss()
-optimizer = optim.Adam(model.parameters(), lr=LR)
+optimizer = optim.Adam(model.parameters(), lr=lr)
 
 # Initialize variables to track the best loss
 best_loss = float('inf')

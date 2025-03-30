@@ -1,9 +1,43 @@
 import wandb
 import torch
 import os
+import re
+import numpy as np
+import pandas as pd
 
 from python_utils.printer import Printer
 global_printer = Printer()
+
+def load_data(file_path, time_steps=30, random_sampling_params=None, sche_sampling_params=None):
+    match = re.match(r'(.+)_\d+\.csv', os.path.basename(file_path))
+    if match:
+        label = match.group(1)  # "ball"
+    print('     Loading: ', label)
+    df = pd.read_csv(file_path, header=None)
+    df = df.iloc[:, 1:]  # Remove the first column  # shape (x*3)
+
+    if (random_sampling_params is None) == (sche_sampling_params is None):
+        global_printer.print_red('Cannot use random_sampling mode and sche_sampling mode at the same time')
+        raise ValueError('random_sampling and sche_sampling cannot be both None or both not None at the same time.')
+    if random_sampling_params is not None:
+        num_samples = random_sampling_params
+        start_indices = np.random.randint(0, df.shape[0] - time_steps, num_samples)  # Random start indices
+    elif sche_sampling_params is not None:
+        first_part_length = sche_sampling_params[0]
+        sche_step = sche_sampling_params[1]
+        if df.shape[0] < first_part_length + time_steps:
+            global_printer.print_yellow('first_part_length need to be smaller than df.shape[0] (trajectory length)')
+            first_part_length = df.shape[0] - time_steps
+        start_indices = np.arange(0, first_part_length, sche_step)
+
+    samples = []
+    for start_idx in start_indices:
+        segments_np = np.array(df.iloc[start_idx:start_idx+time_steps, :].values.tolist()) 
+        if segments_np.shape[0] != time_steps:
+            global_printer.print_red(f'segments_np.shape = {segments_np.shape}')
+            print(file_path); input()
+        samples.append((segments_np, start_idx, file_path))  # Return sample, index, and file name
+    return samples
 
 def init_wandb(project_name, run_name, config, run_id=None, resume=None, wdb_notes=''):        
     wandb.init(
