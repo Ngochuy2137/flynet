@@ -119,6 +119,44 @@ def save_model(model, optimizer, model_dir, epoch, losses, this_is_best_loss_mod
     else:
         global_printer.print_green(f"    Model saved to {model_save_path}")
 
+def load_model(model, optimizer, checkpoint_path, device='cpu'):
+    """
+    Load model và optimizer từ checkpoint, đưa model về chế độ eval sẵn sàng cho test.
+
+    Args:
+        model (torch.nn.Module): Kiến trúc model đã được khởi tạo sẵn.
+        optimizer (torch.optim.Optimizer): Optimizer tương ứng (có thể chỉ cần để load state).
+        checkpoint_path (str): Đường dẫn tới file checkpoint (.pth).
+        device (str or torch.device): Thiết bị load model (mặc định: 'cpu').
+
+    Returns:
+        model: model đã load trọng số và đặt về eval mode.
+        optimizer: optimizer đã load trạng thái (nếu cần).
+        epoch (int): epoch cuối cùng lưu trong checkpoint.
+        other_info (dict): Các thông tin bổ sung (loss, acc, ...) từ checkpoint.
+    """
+    if not os.path.exists(checkpoint_path):
+        raise FileNotFoundError(f"Checkpoint not found at {checkpoint_path}")
+
+    checkpoint = torch.load(checkpoint_path, map_location=device)
+
+    model.load_state_dict(checkpoint['model_dict'])
+    optimizer.load_state_dict(checkpoint['optimizer_dict'])
+
+    model.to(device)
+    model.eval()
+
+    epoch = checkpoint.get('epoch', -1)
+    best_loss = checkpoint.get('best_loss', None)
+    best_acc = checkpoint.get('best_acc', None)
+    losses = checkpoint.get('losses', None)
+
+    print(f"✅ Loaded model from epoch {epoch} at {checkpoint_path}")
+    if best_loss is not None:
+        print(f"📉 Best loss: {best_loss:.6f}")
+    if best_acc is not None:
+        print(f"🎯 Best accuracy: {best_acc:.6f}")
+    return model, optimizer, epoch
 
 def evaluate_model(model, test_loader, device):
     """
