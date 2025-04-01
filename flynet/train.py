@@ -278,7 +278,8 @@ criterion = nn.CrossEntropyLoss()
 optimizer = optim.Adam(model.parameters(), lr=lr)
 
 # Initialize variables to track the best loss
-best_loss = float('inf')
+best_train_loss = float('inf')
+best_val_acc = 0.0
 
 losses = []
 # plt.ion()  # Interactive mode ON
@@ -315,20 +316,27 @@ for epoch in range(num_epochs):
         # model_save_path = os.path.join(model_dir, f"model_epoch_{epoch+1}.pth")
         # torch.save(model.state_dict(), model_save_path)
         # print(f"Model saved at epoch {epoch+1} to {model_save_path}")
-        flynet_utils.save_model(model, optimizer, model_dir, epoch, losses)
+        flynet_utils.save_model(model, optimizer, model_dir, epoch, losses=losses)
 
-
-    # Save model if it has the lowest loss so far
-    if avg_epoch_loss < best_loss:
-        best_loss = avg_epoch_loss
-        # best_model_path = os.path.join(model_dir, "best_model.pth")
-        # torch.save(model.state_dict(), best_model_path)
-        # print(f"Best model saved with loss: {best_loss} to {best_model_path}")
-        flynet_utils.save_model(model, optimizer, model_dir, epoch, losses, this_is_best_model=True)
-
+    print('-'*20)
     global_printer.print_green(f"Epoch {epoch+1}/{num_epochs}, Avg Loss: {avg_epoch_loss}")
     time_left = (time.time()-time_train_start) / (epoch+1) * (num_epochs - epoch - 1)
     print(f"    Time left: {time.strftime('%H:%M:%S', time.gmtime(time_left))}")
+    # validation
+    acc_rate = flynet_utils.evaluate_model(model, test_loader, device)
+
+    # Save model if it has the lowest loss so far
+    if avg_epoch_loss < best_train_loss:
+        best_train_loss = avg_epoch_loss
+        # best_model_path = os.path.join(model_dir, "best_model.pth")
+        # torch.save(model.state_dict(), best_model_path)
+        # print(f"Best model saved with loss: {best_train_loss} to {best_model_path}")
+        flynet_utils.save_model(model, optimizer, model_dir, epoch, losses=losses, this_is_best_loss_model=losses)
+    # save model if it has the highest accuracy so far
+    if acc_rate > best_val_acc:
+        best_val_acc = acc_rate
+        flynet_utils.save_model(model, optimizer, model_dir, epoch, losses=losses, this_is_best_acc_model=best_val_acc)
+
     wandb.log({
         'Avg Loss': avg_epoch_loss,
         'time left (min)': time_left/60,

@@ -68,9 +68,9 @@ def init_wandb(project_name, run_name, config, run_id=None, resume=None, wdb_not
     # wandb_run_url = wandb.run.url
     return wandb
 
-def save_model(model, optimizer, model_dir, epoch, losses, this_is_best_model=False):
-    if this_is_best_model:
-        best_model_dir = os.path.join(model_dir, "best_model")
+def save_model(model, optimizer, model_dir, epoch, losses, this_is_best_loss_model:list=None, this_is_best_acc_model:float=None):
+    if this_is_best_loss_model is not None:
+        best_model_dir = os.path.join(model_dir, "best_model_loss")
         os.makedirs(best_model_dir, exist_ok=True)
         # delete all files in best_model_dir
         for file in os.listdir(best_model_dir):
@@ -80,7 +80,21 @@ def save_model(model, optimizer, model_dir, epoch, losses, this_is_best_model=Fa
                     os.remove(file_path)
             except Exception as e:
                 print(e)
-        model_name = f"best_model_e_{epoch}.pth"
+        model_name = f"best_model_e_{epoch}_{this_is_best_loss_model[-1]:.6f}.pth"
+        model_save_dir = best_model_dir
+    
+    elif this_is_best_acc_model is not None:
+        best_model_dir = os.path.join(model_dir, "best_model_acc")
+        os.makedirs(best_model_dir, exist_ok=True)
+        # delete all files in best_model_dir
+        for file in os.listdir(best_model_dir):
+            file_path = os.path.join(best_model_dir, file)
+            try:
+                if os.path.isfile(file_path):
+                    os.remove(file_path)
+            except Exception as e:
+                print(e)
+        model_name = f"best_model_e_{epoch}_{this_is_best_acc_model:.6f}.pth"
         model_save_dir = best_model_dir
     else:
         model_name = f"model_epoch_{epoch+1}.pth"
@@ -94,15 +108,17 @@ def save_model(model, optimizer, model_dir, epoch, losses, this_is_best_model=Fa
         'epoch': epoch,
         'model_dict': model.state_dict(),
         'optimizer_dict': optimizer.state_dict(),
-        'losses': losses,
+        'losses': losses[-1],
+        'best_acc': this_is_best_acc_model if this_is_best_acc_model is not None else None,
+        'best_loss': this_is_best_loss_model[-1] if this_is_best_loss_model is not None else None,
     }, model_save_path)
-    if this_is_best_model:
-        if losses:
-            print(f"Best model saved with loss: {losses[-1]} to {model_save_path}")
-        else:
-            global_printer.print_red(f"Best model saved to {model_save_path} but (losses list is empty)")
+    if this_is_best_loss_model is not None:
+        global_printer.print_green(f"    Best model saved with loss: {this_is_best_loss_model[-1]:.6f} to {model_save_path}")
+    elif this_is_best_acc_model is not None:
+        global_printer.print_green(f"    Best model saved with accuracy: {this_is_best_acc_model:.6f} to {model_save_path}")
     else:
-        print(f"Model saved at epoch {epoch+1} to {model_save_path}")
+        global_printer.print_green(f"    Model saved to {model_save_path}")
+
 
 def evaluate_model(model, test_loader, device):
     """

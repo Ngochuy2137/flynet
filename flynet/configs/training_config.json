@@ -5,12 +5,12 @@
         "sche_sampling_params": [60, 1]
     },
     "model": {
-      "hidden_size": 64,
-      "num_layers": 1
+      "hidden_size": 32,
+      "num_layers": 2
     },
     "training": {
       "batch_size": 128,
       "learning_rate": 0.0004,
-      "num_epochs": 500
+      "num_epochs": 1000
     }
 }
