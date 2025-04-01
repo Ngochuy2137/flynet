@@ -15,16 +15,21 @@ class TimeSeriesDataset(torch.utils.data.Dataset):
     def __init__(self, X, y, indices=None, file_paths=None):
         self.X = torch.tensor(X, dtype=torch.float32).to(device)  # Move to device (GPU or CPU)
         self.y = torch.tensor(y, dtype=torch.long).to(device)  # Move to device (GPU or CPU)
-        self.indices = indices  # List of start indices
-        self.file_paths = file_paths  # List of file paths
+        # self.indices = indices  # List of start indices
+        # self.file_paths = file_paths  # List of file paths
 
     def __len__(self):
         return len(self.X)
 
     def __getitem__(self, idx):
-        return self.X[idx], self.y[idx], self.indices[idx], self.file_paths[idx]  # Return index and file path as well
+        if idx >= len(self.X):
+            print(f"❌ idx={idx} vượt quá độ dài X={len(self.X)}")
+        if idx >= len(self.y):
+            print(f"❌ idx={idx} vượt quá độ dài y={len(self.y)}")
+        # return self.X[idx], self.y[idx], self.indices[idx], self.file_paths[idx]  # Return index and file path as well
+        return self.X[idx], self.y[idx]  # Return index and file path as well
     
-def load_data(file_path, time_steps=30, random_sampling_params=None, sche_sampling_params=None):
+def load_data(file_path, time_steps, random_sampling_params=None, sche_sampling_params=None):
     match = re.match(r'(.+)_\d+\.csv', os.path.basename(file_path))
     if match:
         label = match.group(1)  # "ball"
@@ -175,7 +180,8 @@ def evaluate_model(model, test_loader, device):
     total = 0
 
     with torch.no_grad():
-        for inputs, labels, indices, file_paths in test_loader:
+        # for inputs, labels, indices, file_paths in test_loader:
+        for inputs, labels in test_loader:
             inputs, labels = inputs.to(device), labels.to(device)
             outputs = model(inputs)
             _, predicted = torch.max(outputs, 1)
