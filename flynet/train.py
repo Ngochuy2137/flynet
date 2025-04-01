@@ -32,7 +32,7 @@ lr = CONFIG['training']['learning_rate']  # Learning rate
 num_data_files = CONFIG['data_sampling']['num_data_files']  # Number of data files to load
 random_sampling_params = CONFIG['data_sampling']['random_sampling_params']  # Random sampling parameters
 sche_sampling_params = CONFIG['data_sampling']['sche_sampling_params']  # Scheduled sampling parameters
-
+num_epochs = CONFIG['training']['num_epochs']  # Number of epochs
 
 global_printer.print_blue('====================== LOADING CONFIG ======================', background=True)
 print('     Hidden size: ', hidden_size)
@@ -53,14 +53,10 @@ input_data = {
 }
 
 # Read data for ball, big_sized_plane, boomerang, cardboard, chip_star, empty_bottle, empty_can, hat, rain_visor, ring_frisbee
-num_data_files = 400  # Number of files to process
-random_sampling_params = None # 32  # Number of samples per file
-sche_sampling_params = [60, 1]   # [first_part_length, schedule_step]
-num_epochs = 500  # Total number of epochs for training
 
 global_printer.print_blue('====================== LOADING DATA ======================', background=True)
 input('Press ENTER to continue ...')
-for traj_idx in range(400):  # Set the number of epochs to 500
+for traj_idx in range(num_data_files):  # Set the number of epochs to 500
     global_printer.print_blue(f'----- Trajectory ID: {traj_idx} -----')
     # Randomly select files for the current epoch
     ball_file_num = traj_idx  
@@ -210,12 +206,14 @@ print('y shape: ', y.shape)
 
 
 # %%
-# Split into train and test data
-X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+# Split into train data (80%), testing data (10%), and validation data (10%)
+X_train, X_test_val, y_train, y_test_val = train_test_split(X, y, test_size=0.2, random_state=42)
+X_test, X_val, y_test, y_val = train_test_split(X_test_val, y_test_val, test_size=0.5, random_state=42)
 
 # Reshape the data (for LSTM input)
 X_train = X_train.reshape(X_train.shape[0], X_train.shape[1], X_train.shape[2])  # (Number of samples, Time steps, Features)    # actually no meaning
 X_test = X_test.reshape(X_test.shape[0], X_test.shape[1], X_test.shape[2])  # (Number of samples, Time steps, Features)         # actually no meaning
+X_val = X_val.reshape(X_val.shape[0], X_val.shape[1], X_val.shape[2])       # (Number of samples, Time steps, Features)         # actually no meaning
 
 # Initialize the model
 input_size = X_train.shape[2]  # Number of features
@@ -254,10 +252,12 @@ for obj in input_data.keys():
 
 train_dataset = flynet_utils.TimeSeriesDataset(X_train, y_train, train_indices, train_file_paths)
 test_dataset = flynet_utils.TimeSeriesDataset(X_test, y_test, test_indices, test_file_paths)
+val_dataset = flynet_utils.TimeSeriesDataset(X_val, y_val, test_indices, test_file_paths)
 
 # Create DataLoader with batch size batch_size
 train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
 test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
 
 # Define the LSTM model
 class LSTMClassifier(nn.Module):
@@ -335,20 +335,21 @@ for epoch in range(num_epochs):
     }, step=epoch)
 
 # Model evaluation
-model.eval()
-correct = 0
-total = 0
-with torch.no_grad():
-    for inputs, labels, indices, file_paths in test_loader:
-        inputs, labels = inputs.to(device), labels.to(device)  # Move data to device (GPU or CPU)
-        outputs = model(inputs)
-        _, predicted = torch.max(outputs, 1)
-        for i in range(len(predicted)):
-            predicted_label = predicted[i].item()
-            actual_label = labels[i].item()
-            print(f"Test Sample CSV: {file_paths[i]}, Start Index: {indices[i]}, Predicted: {predicted_label}, Actual: {actual_label}")
+flynet_utils.evaluate_model(model, test_loader, device)
+# model.eval()
+# correct = 0
+# total = 0
+# with torch.no_grad():
+#     for inputs, labels, indices, file_paths in test_loader:
+#         inputs, labels = inputs.to(device), labels.to(device)  # Move data to device (GPU or CPU)
+#         outputs = model(inputs)
+#         _, predicted = torch.max(outputs, 1)
+#         # for i in range(len(predicted)):
+#         #     predicted_label = predicted[i].item()
+#         #     actual_label = labels[i].item()
+#         #     print(f"Test Sample CSV: {file_paths[i]}, Start Index: {indices[i]}, Predicted: {predicted_label}, Actual: {actual_label}")
 
-        total += labels.size(0)
-        correct += (predicted == labels).sum().item()
+#         total += labels.size(0)
+#         correct += (predicted == labels).sum().item()
 
-print(f'Accuracy: {100 * correct / total}%')
+# print(f'Accuracy: {100 * correct / total}%')

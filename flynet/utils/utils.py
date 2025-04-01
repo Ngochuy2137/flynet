@@ -8,6 +8,22 @@ import pandas as pd
 from python_utils.printer import Printer
 global_printer = Printer()
 
+
+# Create PyTorch dataset
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+class TimeSeriesDataset(torch.utils.data.Dataset):
+    def __init__(self, X, y, indices=None, file_paths=None):
+        self.X = torch.tensor(X, dtype=torch.float32).to(device)  # Move to device (GPU or CPU)
+        self.y = torch.tensor(y, dtype=torch.long).to(device)  # Move to device (GPU or CPU)
+        self.indices = indices  # List of start indices
+        self.file_paths = file_paths  # List of file paths
+
+    def __len__(self):
+        return len(self.X)
+
+    def __getitem__(self, idx):
+        return self.X[idx], self.y[idx], self.indices[idx], self.file_paths[idx]  # Return index and file path as well
+    
 def load_data(file_path, time_steps=30, random_sampling_params=None, sche_sampling_params=None):
     match = re.match(r'(.+)_\d+\.csv', os.path.basename(file_path))
     if match:
@@ -88,17 +104,31 @@ def save_model(model, optimizer, model_dir, epoch, losses, this_is_best_model=Fa
     else:
         print(f"Model saved at epoch {epoch+1} to {model_save_path}")
 
-# Create PyTorch dataset
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-class TimeSeriesDataset(torch.utils.data.Dataset):
-    def __init__(self, X, y, indices=None, file_paths=None):
-        self.X = torch.tensor(X, dtype=torch.float32).to(device)  # Move to device (GPU or CPU)
-        self.y = torch.tensor(y, dtype=torch.long).to(device)  # Move to device (GPU or CPU)
-        self.indices = indices  # List of start indices
-        self.file_paths = file_paths  # List of file paths
+def evaluate_model(model, test_loader, device):
+    """
+    Đánh giá mô hình trên tập test và in ra dự đoán từng mẫu.
 
-    def __len__(self):
-        return len(self.X)
+    Args:
+        model (torch.nn.Module): Mô hình đã huấn luyện.
+        test_loader (DataLoader): DataLoader cho tập test.
+        device (torch.device): CPU hoặc GPU.
+    
+    Returns:
+        float: Accuracy trên tập test.
+    """
+    model.eval()
+    correct = 0
+    total = 0
 
-    def __getitem__(self, idx):
-        return self.X[idx], self.y[idx], self.indices[idx], self.file_paths[idx]  # Return index and file path as well
+    with torch.no_grad():
+        for inputs, labels, indices, file_paths in test_loader:
+            inputs, labels = inputs.to(device), labels.to(device)
+            outputs = model(inputs)
+            _, predicted = torch.max(outputs, 1)
+
+            total += labels.size(0)
+            correct += (predicted == labels).sum().item()
+
+    accuracy = 100 * correct / total if total > 0 else 0.0
+    print(f'    Accuracy: {accuracy:.2f}%')
+    return accuracy
