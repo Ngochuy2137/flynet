@@ -2,7 +2,7 @@
     "data_sampling": {
         "num_data_files": 400,
         "random_sampling_params": null,
-        "sche_sampling_params": [60, 1]
+        "sche_sampling_params": [40, 1] 
     },
     "model": {
       "hidden_size": 32,
