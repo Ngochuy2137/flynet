@@ -207,12 +207,10 @@ print('y shape: ', y.shape)
 
 # %%
 # Split into train data (80%), testing data (10%), and validation data (10%)
-X_train, X_test_val, y_train, y_test_val = train_test_split(X, y, test_size=0.2, random_state=42)
-X_test, X_val, y_test, y_val = train_test_split(X_test_val, y_test_val, test_size=0.5, random_state=42)
+X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.2, random_state=42)
 
 # Reshape the data (for LSTM input)
 X_train = X_train.reshape(X_train.shape[0], X_train.shape[1], X_train.shape[2])  # (Number of samples, Time steps, Features)    # actually no meaning
-X_test = X_test.reshape(X_test.shape[0], X_test.shape[1], X_test.shape[2])  # (Number of samples, Time steps, Features)         # actually no meaning
 X_val = X_val.reshape(X_val.shape[0], X_val.shape[1], X_val.shape[2])       # (Number of samples, Time steps, Features)         # actually no meaning
 
 # Initialize the model
@@ -251,12 +249,10 @@ for obj in input_data.keys():
     test_file_paths.extend([x[2] for x in input_data[obj][len(X_train)//len(input_data.keys()):]])
 
 train_dataset = flynet_utils.TimeSeriesDataset(X_train, y_train, train_indices, train_file_paths)
-test_dataset = flynet_utils.TimeSeriesDataset(X_test, y_test, test_indices, test_file_paths)
 val_dataset = flynet_utils.TimeSeriesDataset(X_val, y_val, test_indices, test_file_paths)
 
 # Create DataLoader with batch size batch_size
 train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 val_loader = torch.utils.data.DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
 
 # Define the LSTM model
@@ -323,7 +319,7 @@ for epoch in range(num_epochs):
     time_left = (time.time()-time_train_start) / (epoch+1) * (num_epochs - epoch - 1)
     print(f"    Time left: {time.strftime('%H:%M:%S', time.gmtime(time_left))}")
     # validation
-    acc_rate = flynet_utils.evaluate_model(model, test_loader, device)
+    acc_rate = flynet_utils.evaluate_model(model, val_loader, device)
 
     # Save model if it has the lowest loss so far
     if avg_epoch_loss < best_train_loss:
@@ -340,10 +336,9 @@ for epoch in range(num_epochs):
     wandb.log({
         'Avg Loss': avg_epoch_loss,
         'time left (min)': time_left/60,
+        'Accuracy': acc_rate,
     }, step=epoch)
 
-# Model evaluation
-flynet_utils.evaluate_model(model, test_loader, device)
 # model.eval()
 # correct = 0
 # total = 0
