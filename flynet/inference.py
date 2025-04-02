@@ -80,7 +80,17 @@ class FlyNetInfer:
     def load_model(self, input_size, output_size, hidden_size, lstm_layers):
         print('FLYNET: Loading model from', self.model_path)
         self.model = LSTMClassifier(input_size, hidden_size, output_size, lstm_layers).to(self.device)
-        self.model.load_state_dict(torch.load(self.model_path, map_location=self.device, weights_only=True))
+        checkpoint = torch.load(self.model_path, map_location=self.device, weights_only=True)
+        # Nếu checkpoint là dict và có 'model_dict' bên trong
+        if isinstance(checkpoint, dict) and 'model_dict' in checkpoint:
+            print("Found 'model_dict' in checkpoint. Loading from checkpoint['model_dict'].")
+            self.model.load_state_dict(checkpoint['model_dict'])
+        # Nếu checkpoint chính là state_dict
+        elif isinstance(checkpoint, dict) and any(k.startswith('lstm') or k.startswith('fc') for k in checkpoint.keys()):
+            print("Checkpoint looks like a state_dict. Loading directly.")
+            self.model.load_state_dict(checkpoint)
+        else:
+            raise ValueError("Checkpoint format not recognized for model loading.")
         self.model.eval()
 
     def extract(self, test_samples, get_feature_only=False):
