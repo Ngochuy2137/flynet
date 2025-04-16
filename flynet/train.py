@@ -31,10 +31,9 @@ class Config:
         self.lr = cfg['training']['learning_rate']
         self.num_epochs = cfg['training']['num_epochs']
         # Data sampling params
-        self.num_data_files = cfg['data_sampling']['num_data_files']
         self.input_seg_len = cfg['data_sampling']['input_seg_len']
-        self.random_sampling_params = cfg['data_sampling']['random_sampling_params']
-        self.sche_sampling_params = cfg['data_sampling']['sche_sampling_params']
+        # Debugging params
+        self.debug = cfg['debug']
 
 
 # ---------------------------
@@ -66,9 +65,6 @@ class DataLoaderFlynet:
         print(f'     Number of layers: {self.config.num_layers}')
         print(f'     Batch size: {self.config.batch_size}')
         print(f'     Learning rate: {self.config.lr}')
-        print(f'     Number of data files: {self.config.num_data_files}')
-        print(f'     Random sampling parameters: {self.config.random_sampling_params}')
-        print(f'     Scheduled sampling parameters: {self.config.sche_sampling_params}')
         
         if self.interactive:
             input('Press ENTER to continue ...')
@@ -270,9 +266,9 @@ def main():
     config = Config(config_path='configs/training_config.json')
     
     DATA_PARENT_FOLDER = os.getenv('NAE_DATASET20')
-    DATA_TRAIN_LIM = 1
-    DATA_VAL_LIM = 1
-    ENABLE_WANDB = False
+    DATA_TRAIN_LIM = config.debug['data_train_lim']
+    DATA_VAL_LIM = config.debug['data_val_lim']
+    ENABLE_WANDB = config.debug['enable_wandb']
 
 
     # Create a DataLoaderFlynet instance

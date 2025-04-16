@@ -1,17 +1,19 @@
 {
     "data_sampling": {
-      "num_data_files": 400,
-      "random_sampling_params": null,
-      "sche_sampling_params": [40, 1],
       "input_seg_len": 30
     },
     "model": {
-      "hidden_size": 32,
-      "num_layers": 2
+      "hidden_size": 128,
+      "num_layers": 1
     },
     "training": {
       "batch_size": 128,
       "learning_rate": 0.0004,
       "num_epochs": 1000
+    },
+    "debug": {
+      "data_train_lim": null,
+      "data_val_lim": null,
+      "enable_wandb": false
     }
 }
