@@ -13,6 +13,8 @@ import matplotlib.pyplot as plt
 
 from python_utils.printer import Printer
 from flynet.utils import utils as flynet_utils
+from nae_static.utils.submodules.training_utils.data_loader import DataLoader as NAEDataLoader
+from nae_static.utils.submodules.training_utils.input_label_generator import InputLabelGenerator
 
 # ---------------------------
 # Configuration Class
@@ -38,7 +40,7 @@ class Config:
 # ---------------------------
 # Data Handling Class
 # ---------------------------
-class DataHandler:
+class DataLoaderFlynet:
     def __init__(self, data_parent_folder: str, config: Config, printer: Printer, interactive: bool = False):
         self.data_parent_folder = data_parent_folder
         self.config = config
@@ -51,11 +53,14 @@ class DataHandler:
             'sand_can', 'soft_frisbee', 'basket', 'carpet', 'styrofoam'
         ]
         # Initialize container to hold the raw data
-        self.input_data = {obj: [] for obj in self.objects}
+        # self.input_data = {obj: [] for obj in self.objects}
         # Create a label mapping based on the order (or provide your own mapping)
         self.labels = {obj: idx for idx, obj in enumerate(self.objects)}
     
-    def load_all_data(self):
+    def load_all_train_val_test_dataset(self, data_train_lim=None, data_val_lim=None):
+        '''
+        Load all data of the specified objects from the data parent folder.
+        '''
         self.printer.print_blue('====================== LOADING CONFIG ======================', background=True)
         print(f'     Hidden size: {self.config.hidden_size}')
         print(f'     Number of layers: {self.config.num_layers}')
@@ -72,54 +77,58 @@ class DataHandler:
         if self.interactive:
             input('Press ENTER to continue ...')
         
-        for traj_idx in range(self.config.num_data_files):
-            self.printer.print_blue(f'----- Trajectory ID: {traj_idx} -----')
-            for obj in self.objects:
-                file_path = os.path.join(self.data_parent_folder,
-                                         obj,
-                                         '3-data-augmented',
-                                         'all',
-                                         f'{obj}_{traj_idx}.csv')
-                # Load data using your flynet utility. It should return an iterable of (sample, start_idx, file_path)
-                data_iter = flynet_utils.load_data(
-                    file_path,
-                    time_steps=self.config.input_seg_len,
-                    random_sampling_params=self.config.random_sampling_params,
-                    sche_sampling_params=self.config.sche_sampling_params
-                )
-                for sample, start_idx, file_path in data_iter:
-                    self.input_data[obj].append((sample, start_idx, file_path))
-        
+        # Load from data_train
+        X_train_list = []
+        y_train_list = []
+        # load from data_val, data_test
+        X_val_list = []
+        y_val_list = []
+        nae_data_loader = NAEDataLoader() 
+        input_label_generator = InputLabelGenerator()
+
+        for obj in self.objects:
+            data_split_path = os.path.join(self.data_parent_folder,
+                                        obj,
+                                        '3-data-augmented',
+                                        'data_plit')
+            data_train, data_val, data_test = nae_data_loader.load_train_val_test_dataset(data_split_path, file_format='csv')
+            data_val = data_val + data_test
+
+            if data_train_lim is not None:
+                data_train = data_train[:data_train_lim]
+            if data_val_lim is not None:
+                data_val = data_val[:data_val_lim]
+
+            data_train  = input_label_generator.generate_input_label_static_seq(data_train, self.config.input_seg_len, 10)
+            X_train = data_train[0]  # only use input_seq element
+            data_val    = input_label_generator.generate_input_label_static_seq(data_val, self.config.input_seg_len, 10)
+            X_val = data_val[0]  # only use input_seq element
+            
+            y_train = np.full(len(X_train), self.labels[obj])
+            y_val = np.full(len(X_val), self.labels[obj])
+
+            # Append to the list
+            X_train_list.append(X_train)
+            y_train_list.append(y_train)
+            X_val_list.append(X_val)
+            y_val_list.append(y_val)
+            self.printer.print_blue(f'Loaded {len(X_train)} training samples and {len(X_val)} validation samples for {obj}', background=True)
+            if self.interactive:
+                input('Press ENTER to continue ...')
+
         self.printer.print_blue('Done loading data, starting setup input/label for training', background=True)
         if self.interactive:
             input('Press ENTER to continue ...')
+        
+        X_train_all = np.concatenate(X_train_list, axis=0)
+        y_train_all = np.concatenate(y_train_list, axis=0)
+        X_val_all = np.concatenate(X_val_list, axis=0)
+        y_val_all = np.concatenate(y_val_list, axis=0)
 
-    def prepare_datasets(self):
-        # Combine data for each object into X and y arrays
-        X_list, y_list = [], []
-        for obj in self.objects:
-            # Extract only the sample (first element in each tuple)
-            traj_segments = [seg[0] for seg in self.input_data[obj]]
-            X_obj = np.array(traj_segments)
-            y_obj = np.full(len(X_obj), self.labels[obj])
-            X_list.append(X_obj)
-            y_list.append(y_obj)
-        X = np.concatenate(X_list, axis=0)
-        y = np.concatenate(y_list, axis=0)
-        print('X shape: ', X.shape)
-        print('y shape: ', y.shape)
-        
-        # Split data into training (80%) and validation (20%)
-        X_train, X_val, y_train, y_val = train_test_split(X, y, test_size=0.2, random_state=42)
-        
-        # Reshape if needed for your LSTM input (Number of samples, Time steps, Features)
-        X_train = X_train.reshape(X_train.shape[0], X_train.shape[1], X_train.shape[2])
-        X_val = X_val.reshape(X_val.shape[0], X_val.shape[1], X_val.shape[2])
-        
-        # Create the dataset objects using your flynet_utils (assumes you have TimeSeriesDataset)
-        train_dataset = flynet_utils.TimeSeriesDataset(X_train, y_train)
-        val_dataset = flynet_utils.TimeSeriesDataset(X_val, y_val)
-        return train_dataset, val_dataset, len(self.objects), X_train.shape[2]  # (train_dataset, val_dataset, num_classes, input_size)
+        train_dataset = flynet_utils.TimeSeriesDataset(X_train_all, y_train_all)
+        val_dataset = flynet_utils.TimeSeriesDataset(X_val_all, y_val_all)
+
+        return train_dataset, val_dataset, len(self.objects), X_train.shape[2]  # (train_dataset, val_dataset, num_classes, feature_dim)
 
 
 # ---------------------------
@@ -142,13 +151,13 @@ class LSTMClassifier(nn.Module):
 # Trainer Class
 # ---------------------------
 class Trainer:
-    def __init__(self, config: Config, train_dataset, val_dataset, input_size, num_classes, device=None):
+    def __init__(self, config: Config, train_dataset, val_dataset, feature_dim, num_classes, device=None, enable_wandb=False):
         self.config = config
         self.device = device or torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         
         # Initialize model, loss, and optimizer
         self.model = LSTMClassifier(
-            input_size=input_size,
+            input_size=feature_dim,
             hidden_size=self.config.hidden_size,
             output_size=num_classes,
             num_layers=self.config.num_layers
@@ -164,20 +173,23 @@ class Trainer:
         current_time = datetime.now().strftime("%Y%m%d_%H%M%S")
         self.model_dir = os.path.join("models", current_time)
         os.makedirs(self.model_dir, exist_ok=True)
-        self.wandb = flynet_utils.init_wandb(
-            project_name='Flynet',
-            run_name=f'hid{self.config.hidden_size}_layer{self.config.num_layers}_{current_time}',
-            config={
-                'input_size': input_size,
-                'hidden_size': self.config.hidden_size,
-                'output_size': num_classes,
-                'num_layers': self.config.num_layers,
-                'learning_rate': self.config.lr,
-                'batch_size': self.config.batch_size,
-                'num_epochs': self.config.num_epochs
-            },
-            run_id=None, resume=None, wdb_notes=''
-        )
+
+        self.enable_wandb = enable_wandb
+        if self.enable_wandb:
+            self.wandb = flynet_utils.init_wandb(
+                project_name='Flynet',
+                run_name=f'hid{self.config.hidden_size}_layer{self.config.num_layers}_{current_time}',
+                config={
+                    'feature_dim': feature_dim,
+                    'hidden_size': self.config.hidden_size,
+                    'output_size': num_classes,
+                    'num_layers': self.config.num_layers,
+                    'learning_rate': self.config.lr,
+                    'batch_size': self.config.batch_size,
+                    'num_epochs': self.config.num_epochs
+                },
+                run_id=None, resume=None, wdb_notes=''
+            )
         # Placeholders for tracking performance
         self.best_train_loss = float('inf')
         self.best_val_acc = 0.0
@@ -235,12 +247,12 @@ class Trainer:
             if acc_rate > self.best_val_acc:
                 self.best_val_acc = acc_rate
                 flynet_utils.save_model(self.model, self.optimizer, self.model_dir, epoch, losses=self.losses, this_is_best_acc_model=acc_rate)
-            
-            self.wandb.log({
-                'Avg Loss': avg_epoch_loss,
-                'time left (min)': time_left/60,
-                'Accuracy': acc_rate,
-            }, step=epoch)
+            if self.enable_wandb:
+                self.wandb.log({
+                    'Avg Loss': avg_epoch_loss,
+                    'time left (min)': time_left/60,
+                    'Accuracy': acc_rate,
+                }, step=epoch)
         
         plt.ioff()
         plt.show()
@@ -255,13 +267,17 @@ def main():
     config = Config(config_path='configs/training_config.json')
     
     DATA_PARENT_FOLDER = os.getenv('NAE_DATASET20')
-    # Create a DataHandler instance
-    data_handler = DataHandler(DATA_PARENT_FOLDER, config, printer, interactive=False)
-    data_handler.load_all_data()
-    train_dataset, val_dataset, num_classes, input_size = data_handler.prepare_datasets()
+    DATA_TRAIN_LIM = 1
+    DATA_VAL_LIM = 1
+    ENABLE_WANDB = False
+
+
+    # Create a DataLoaderFlynet instance
+    data_loader_flynet = DataLoaderFlynet(DATA_PARENT_FOLDER, config, printer, interactive=False)
+    train_dataset, val_dataset, num_classes, feature_dim = data_loader_flynet.load_all_train_val_test_dataset(data_train_lim=DATA_TRAIN_LIM, data_val_lim=DATA_VAL_LIM)
     
     # Create the Trainer and start training
-    trainer = Trainer(config, train_dataset, val_dataset, input_size, num_classes)
+    trainer = Trainer(config, train_dataset, val_dataset, feature_dim, num_classes, enable_wandb=ENABLE_WANDB)
     trainer.train()
 
 
