@@ -195,11 +195,12 @@ class Trainer:
         self.best_val_acc = 0.0
         self.losses = []
     
-    def train(self):
+    def train(self, enable_plt=False):
         time_train_start = time.time()
         # Optionally, set up a live plot
-        plt.ion()
-        fig, ax = plt.subplots(figsize=(8, 5))
+        if enable_plt:
+            plt.ion()
+            fig, ax = plt.subplots(figsize=(8, 5))
         
         for epoch in range(self.config.num_epochs):
             self.model.train()
@@ -216,15 +217,16 @@ class Trainer:
             avg_epoch_loss = epoch_loss / len(self.train_loader)
             self.losses.append(avg_epoch_loss)
             
-            # Update loss plot
-            ax.clear()
-            ax.plot(range(1, len(self.losses) + 1), self.losses, linestyle='-')
-            ax.set_xlabel("Epoch")
-            ax.set_ylabel("Loss")
-            ax.grid()
-            if epoch > 100:
-                ax.set_ylim(0, 0.1)
-            plt.pause(0.1)
+            if enable_plt:
+                # Update loss plot
+                ax.clear()
+                ax.plot(range(1, len(self.losses) + 1), self.losses, linestyle='-')
+                ax.set_xlabel("Epoch")
+                ax.set_ylabel("Loss")
+                ax.grid()
+                if epoch > 100:
+                    ax.set_ylim(0, 0.1)
+                plt.pause(0.1)
             
             print('-'*20)
             print(f"Epoch {epoch+1}/{self.config.num_epochs}, Avg Loss: {avg_epoch_loss:.4f}")
@@ -254,8 +256,9 @@ class Trainer:
                     'Accuracy': acc_rate,
                 }, step=epoch)
         
-        plt.ioff()
-        plt.show()
+        if enable_plt:
+            plt.ioff()
+            plt.show()
 
 
 # ---------------------------
