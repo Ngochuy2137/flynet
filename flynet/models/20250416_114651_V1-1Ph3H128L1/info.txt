@@ -1,0 +1,4 @@
+- Data in data_plit folder
+- Use preprocess to use 9 features
+- Hidden: 128
+- LSTM layers: 1
