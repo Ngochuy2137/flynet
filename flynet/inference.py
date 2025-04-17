@@ -75,6 +75,11 @@ class FlyNetInfer:
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.model_path = model_path
         self.model = None
+        self.input_size = input_size
+        self.output_size = output_size
+        self.hidden_size = hidden_size
+        self.lstm_layers = lstm_layers
+
         self.load_model(input_size, output_size, hidden_size, lstm_layers)
 
     def load_model(self, input_size, output_size, hidden_size, lstm_layers):
@@ -93,7 +98,7 @@ class FlyNetInfer:
             raise ValueError("Checkpoint format not recognized for model loading.")
         self.model.eval()
 
-    def extract(self, test_samples, get_feature_only=False):
+    def extract(self, test_samples, get_feature_only=False, get_last_step_feature=False):
         '''
         extract feature of trajectory data
         '''
@@ -102,16 +107,20 @@ class FlyNetInfer:
             test_samples = torch.tensor(test_samples, dtype=torch.float32)
         with torch.no_grad():
             lstm_out, (h_n, c_n) = self.model.lstm(test_samples.to(self.device))
-            lstm_features = h_n[-1]
-            # print('lstm_features shape: ', lstm_features.shape)
+
+            if get_last_step_feature:
+                fly_features = h_n[-1]
+            else:
+                fly_features = lstm_out
+
+            # get feature only
             if get_feature_only:
-                return lstm_features
+                return fly_features
             
-            print("LSTM output before FC layer (first 5 samples):")
-            # print(lstm_features[:5])
-            outputs = self.model.fc(lstm_features)
-            _, predicted = torch.max(outputs, 1)
-        return predicted
+            # get classification result
+            outputs = self.model.fc(fly_features)
+            _, pred_class = torch.max(outputs, 1)
+        return pred_class
 
     def offline_run(self, data_parent_dir, categories):
         data_loader = DataLoader(data_parent_dir, categories)
